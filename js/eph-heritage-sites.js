@@ -316,7 +316,7 @@ let html = '';
   }
 
   // --- URUTAN 4: TAUTAN TAMBAHKAN DATA LAINNYA (Tampil Default) ---
-  let tautanTambah = `<p><a href="${wikiBaseUrl}" target="_blank" class="sunting-linktambah" title="Tambahkan data di Wikidata" style="font-style: italic;">Lengkapi/perbarui data di Wikidata!</a></p>`;
+  let tautanTambah = `<p><a href="${wikiBaseUrl}" target="_blank" class="sunting-linktambah" title="Tambahkan data di Wikidata" style="font-style: italic;">Lengkapi data di Wikidata!</a></p>`;
   html += tautanTambah;
 
   // --- EKSEKUSI RENDER & HAPUS LOADER ---
