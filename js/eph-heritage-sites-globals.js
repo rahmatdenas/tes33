@@ -1,70 +1,37 @@
 'use strict';
 
-// 1. UBAH JUDUL PETA
+// 1. JUDUL PETA
 const BASE_TITLE = 'WikiSurau';
 
-// 2. ORGS: Kita akali menjadi singkatan nama daerah untuk label
-const ORGS = {
-  AGM: 'Kabupaten Agam',
-  DHM: 'Kabupaten Dharmasraya',
-  MTW: 'Kabupaten Kepulauan Mentawai',
-  LPK: 'Kabupaten Lima Puluh Kota',
-  PDP: 'Kabupaten Padang Pariaman',
-  PSM: 'Kabupaten Pasaman',
-  PSB: 'Kabupaten Pasaman Barat',
-  PSS: 'Kabupaten Pesisir Selatan',
-  SJJ: 'Kabupaten Sijunjung',
-  SLK: 'Kabupaten Solok',
-  SLS: 'Kabupaten Solok Selatan',
-  TND: 'Kabupaten Tanah Datar',
-  BKT: 'Kota Bukittinggi',
-  PDG: 'Kota Padang',
-  PPJ: 'Kota Padang Panjang',
-  PRM: 'Kota Pariaman',
-  PYK: 'Kota Payakumbuh',
-  SWL: 'Kota Sawahlunto',
-  KSL: 'Kota Solok',
-  // Tambahkan singkatan lain jika perlu
-};
+// ---------------------------------------------------------
+// CATATAN PENTING:
+// Objek statis `ORGS` dan `DESIGNATION_TYPES` telah dihapus.
+// Pengelompokan kini akan dilakukan secara dinamis oleh JavaScript
+// saat memproses hasil `provinsiLabel` dari SPARQL_QUERY_0.
+// ---------------------------------------------------------
 
-// 3. DESIGNATION_TYPES: Kita akali dengan ID Wikidata Kabupaten/Kota
-// Ini yang akan dibaca oleh Dropdown template Anda
-const DESIGNATION_TYPES = {
-  Q6019: { org: 'AGM', name: 'Kabupaten Agam', order: 1 },
-  Q6024: { org: 'DHM', name: 'Kabupaten Dharmasraya', order: 2 },
-  Q6038: { org: 'MTW', name: 'Kabupaten Kepulauan Mentawai', order: 3 },
-  Q6032: { org: 'LPK', name: 'Kabupaten Lima Puluh Kota', order: 4 },
-  Q6042: { org: 'PDP', name: 'Kabupaten Padang Pariaman', order: 5 },
-  Q6048: { org: 'PSM', name: 'Kabupaten Pasaman', order: 6 },
-  Q6103: { org: 'PSB', name: 'Kabupaten Pasaman Barat', order: 7 },
-  Q6065: { org: 'PSS', name: 'Kabupaten Pesisir Selatan', order: 8 },
-  Q6055: { org: 'SJJ', name: 'Kabupaten Sijunjung', order: 9 },
-  Q6058: { org: 'SLK', name: 'Kabupaten Solok', order: 10 },
-  Q6083: { org: 'SLS', name: 'Kabupaten Solok Selatan', order: 11 },
-  Q6093: { org: 'TND', name: 'Kabupaten Tanah Datar', order: 12 },
-  Q7248: { org: 'BKT', name: 'Kota Bukittinggi', order: 13 },
-  Q7253: { org: 'PDG', name: 'Kota Padang', order: 14 },
-  Q7256: { org: 'PPJ', name: 'Kota Padang Panjang', order: 15 },
-  Q7258: { org: 'PRM', name: 'Kota Pariaman', order: 16 },
-  Q7261: { org: 'PYK', name: 'Kota Payakumbuh', order: 17 },
-  Q7263: { org: 'SWL', name: 'Kota Sawahlunto', order: 18 },
-  Q7266: { org: 'KSL', name: 'Kota Solok', order: 19 },
-};
-
-// 4. SPARQL_QUERY_0: Versi Optimasi Ekstrem (Tanpa FILTER LANG & ORDER BY)
+// 2. SPARQL_QUERY_0: Versi Skala Nasional (Dinamis berdasarkan Provinsi)
 const SPARQL_QUERY_0 =
-`SELECT ?siteQid ?siteLabel ?designationQid ?p131LokasiLabel ?tahunBerdiriMentah ?tahunPresisi ?isKlasterPenting WHERE {
-  # 1. Daftarkan target Kabupaten/Kota
-  VALUES ?designation { wd:Q6019 wd:Q6024 wd:Q6038 wd:Q6032 wd:Q6042 wd:Q6048 wd:Q6103 wd:Q6065 wd:Q6055 wd:Q6058 wd:Q6083 wd:Q6093 wd:Q7248 wd:Q7253 wd:Q7256 wd:Q7258 wd:Q7261 wd:Q7263 wd:Q7266 }  
+`SELECT DISTINCT ?siteQid ?siteLabel ?provinsiQid ?provinsiLabel ?p131LokasiLabel ?tahunBerdiriMentah ?tahunPresisi
+WHERE {
+  # 1. Subquery untuk jangkar 38 provinsi di Indonesia (Q5098)
+  {
+    SELECT ?provinsi WHERE {
+      ?provinsi wdt:P31 wd:Q5098 .
+    }
+  }
   
-  # 2. Ambil entitas Masjid yang berada dalam cakupan wilayah di atas
-  ?site wdt:P31 wd:Q32815 ;
-        wdt:P131+ ?designation .
+  # 2. Daftarkan 4 jenis entitas (masjid, surau, dsb)
+  VALUES ?jenis { wd:Q32815 wd:Q56235676 wd:Q56235673 wd:Q1454820 }
   
-  # 3. Ambil lokasi persis (Kecamatan/Nagari) secara opsional
+  # 3. Cari entitas yang sesuai dengan jenis di atas, secara transitif di bawah provinsi
+  ?site wdt:P31 ?jenis ;
+        wdt:P131+ ?provinsi .
+  
+  # 4. Ambil lokasi persis (Kecamatan/Nagari) secara opsional
   OPTIONAL { ?site wdt:P131 ?p131Lokasi . }
       
-  # 4. Ambil data tahun
+  # 5. Ambil data tahun
   OPTIONAL { 
     ?site p:P571 ?inceptionStmt .
     ?inceptionStmt psv:P571 ?inceptionNode .
@@ -72,21 +39,15 @@ const SPARQL_QUERY_0 =
                    wikibase:timePrecision ?tahunPresisi .
   }
   
-  # 5. KUNCI OPTIMASI: Cek 3 tipe klaster penting sekaligus dalam 1 tarikan napas
-  BIND(EXISTS {
-    VALUES ?tipePenting { wd:Q56235676 wd:Q56235673 wd:Q1454820 }
-    ?site wdt:P31 ?tipePenting .
-  } AS ?isKlasterPenting)
-  
-  # 6. Potong URL menjadi ID murni
-  BIND (SUBSTR(STR(?site), 32) AS ?siteQid) .
-  BIND (SUBSTR(STR(?designation), 32) AS ?designationQid) .
+  # 6. Potong URL menjadi ID murni (provinsiQid akan menjadi jangkar indeks)
+  BIND(SUBSTR(STR(?site), 32) AS ?siteQid) .
+  BIND(SUBSTR(STR(?provinsi), 32) AS ?provinsiQid) .
 
-  # 7. Gunakan layanan otomatis Wikidata untuk menerjemahkan ke bahasa Indonesia
-  SERVICE wikibase:label { bd:serviceParam wikibase:language "id,min". }
+  # 7. Kunci label hanya dalam bahasa Indonesia
+  SERVICE wikibase:label { bd:serviceParam wikibase:language "id". }
 }`;
 
-// 5. SPARQL_QUERY_1: Hanya mengambil koordinat P625
+// 3. SPARQL_QUERY_1: Hanya mengambil koordinat P625
 const SPARQL_QUERY_1 =
 `SELECT ?siteQid ?coord WHERE {
   <SPARQLVALUESCLAUSE>
@@ -96,7 +57,7 @@ const SPARQL_QUERY_1 =
   BIND (SUBSTR(STR(?site), 32) AS ?siteQid) .
 }`;
 
-// 6. SPARQL_QUERY_3: Mengambil gambar dan link Wikipedia
+// 4. SPARQL_QUERY_3: Mengambil gambar dan link Wikipedia
 const SPARQL_QUERY_3 =
 `SELECT ?siteQid (SAMPLE(?imgUtama) AS ?image) (SAMPLE(?wikiTitle) AS ?wikipediaUrlTitle) WHERE {
   <SPARQLVALUESCLAUSE>
@@ -119,7 +80,7 @@ const SPARQL_QUERY_3 =
   BIND (SUBSTR(STR(?site), 32) AS ?siteQid) .
 } GROUP BY ?siteQid`;
 
-// 7. SPARQL_QUERY_4: Fungsi khusus mengambil Peristiwa Penting untuk satu ID saat diklik
+// 5. SPARQL_QUERY_4: Fungsi khusus mengambil Peristiwa Penting untuk satu ID saat diklik
 function getSparqlQuery4(qid) {
   return `SELECT ?siteQid ?eventLabel ?pointInTime ?ptPrecision ?startTime ?stPrecision ?endTime ?etPrecision WHERE {
     VALUES ?site { wd:${qid} }
@@ -155,7 +116,7 @@ function getSparqlQuery4(qid) {
   }`;
 }
 
-// 8. SPARQL_QUERY_5: Fungsi khusus mengambil arsip gambar untuk satu ID saat diklik
+// 6. SPARQL_QUERY_5: Fungsi khusus mengambil arsip gambar untuk satu ID saat diklik
 function getSparqlQuery5(qid) {
   return `SELECT ?siteQid ?vicinityImage ?vicinityCaption ?pastImage ?pastCaption WHERE {
     VALUES ?site { wd:${qid} }
@@ -186,7 +147,7 @@ function getSparqlQuery5(qid) {
   }`;
 }
 
-// 9. SPARQL_QUERY_6: Fungsi khusus mengambil Kondisi, Kapasitas, dan Kategori Commons (Saat diklik)
+// 7. SPARQL_QUERY_6: Fungsi khusus mengambil Kondisi, Kapasitas, dan Kategori Commons (Saat diklik)
 function getSparqlQuery6(qid) {
   return `SELECT ?siteQid ?kapasitas ?commonsCat ?kondisiLabel WHERE {
     VALUES ?site { wd:${qid} }
@@ -212,5 +173,5 @@ function getSparqlQuery6(qid) {
 const ABOUT_SPARQL_QUERY = ``;
 
 // Globals
-var DesignationIndex;
+var DesignationIndex; // Variabel ini tetap saya pertahankan jika sisa JS Anda masih membutuhkannya, namun bisa diganti konsepnya menggunakan ProvinceIndex dari JS1.
 var Records = {};
